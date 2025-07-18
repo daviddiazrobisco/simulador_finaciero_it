@@ -1,0 +1,9 @@
+{
+    "margen_bruto_%": 35,
+    "costes_fijos_%": 15,
+    "ebitda_%": 12,
+    "utilizacion_%": 70,
+    "subactividad_max_%": 10,
+    "tarifa_eur_dia": 800,
+    "coste_medio_persona_eur": 60000
+}
