@@ -2,17 +2,19 @@ import streamlit as st
 import json
 import pandas as pd
 import matplotlib.pyplot as plt
-import locale
 
-# 🌍 Formato europeo (puntos miles, coma decimales, negativos en rojo con paréntesis)
-locale.setlocale(locale.LC_ALL, 'es_ES.UTF-8')
-
+# 🌍 Función personalizada para formato europeo
 def formato_eur(valor):
     try:
+        valor_abs = abs(valor)
+        partes = f"{valor_abs:,.2f}".split(".")
+        entero = partes[0].replace(",", ".")
+        decimal = partes[1]
+        formato = f"{entero},{decimal}"
         if valor < 0:
-            return f":red[({locale.format_string('%.2f', abs(valor), grouping=True).replace('.', '_').replace(',', '.').replace('_', ',')})]"
+            return f":red[({formato})]"
         else:
-            return locale.format_string('%.2f', valor, grouping=True).replace('.', '_').replace(',', '.').replace('_', ',')
+            return formato
     except:
         return valor
 
