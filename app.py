@@ -136,53 +136,53 @@ st.pyplot(fig)
 # 🟧 ANÁLISIS LÍNEA DE NEGOCIO
 # ---------------------
 st.header("🟧 Análisis por Línea de Negocio")
-lineas = list(param["lineas_negocio"].keys())
-linea_seleccionada = st.selectbox("Selecciona línea de negocio", lineas)
 
-ln = param["lineas_negocio"][linea_seleccionada]
+for linea, ln in param["lineas_negocio"].items():
+    st.subheader(f"📊 KPIs: {linea}")
+    col5, col6, col7, col8 = st.columns(4)
+    col5.metric("Tarifa (€/día)", f"{formato_eur(ln['tarifa'])} €",
+                f"Benchmark: {formato_eur(benchmark['tarifa_eur_dia'])} €")
+    col6.metric("Coste Medio Personal", f"{formato_eur(ln['coste_medio_persona'])} €",
+                f"Benchmark: {formato_eur(benchmark['coste_medio_persona_eur'])} €")
+    col7.metric("Personas", ln["personas"])
+    col8.metric("Utilización (%)", f"{res['subactividad']['utilizacion_real_%']}%",
+                f"Benchmark: {benchmark['utilizacion_%']}%")
 
-# KPIs Línea
-st.subheader(f"📊 KPIs: {linea_seleccionada}")
-col5, col6, col7, col8 = st.columns(4)
-col5.metric("Tarifa (€/día)", f"{formato_eur(ln['tarifa'])} €",
-            f"Benchmark: {formato_eur(benchmark['tarifa_eur_dia'])} €")
-col6.metric("Coste Medio Personal", f"{formato_eur(ln['coste_medio_persona'])} €",
-            f"Benchmark: {formato_eur(benchmark['coste_medio_persona_eur'])} €")
-col7.metric("Personas", ln["personas"])
-col8.metric("Utilización (%)", f"{res['subactividad']['utilizacion_real_%']}%",
-            f"Benchmark: {benchmark['utilizacion_%']}%")
+    # 🎛️ Sliders de simulación
+    st.subheader("🎛️ Simula ajustes:")
+    tarifa = st.slider(f"Tarifa (€/día) - {linea}", 0, 2000, ln["tarifa"], step=50)
+    proyectos = st.slider(f"Nº Proyectos - {linea}", 0, 50, ln["unidades"])
+    personas = st.slider(f"Nº Personas - {linea}", 0, 100, ln["personas"])
+    coste_personal = st.slider(f"Coste Medio Personal (€) - {linea}", 30000, 90000, ln["coste_medio_persona"], step=5000)
+    subactividad = st.slider(f"Subactividad (%) - {linea}", 0, 30, param["subactividad_permitida_%"])
 
-# 🎛️ Sliders de simulación
-st.subheader("🎛️ Simula ajustes:")
-tarifa = st.slider("Tarifa (€/día)", 0, 2000, ln["tarifa"], step=50)
-proyectos = st.slider("Nº Proyectos", 0, 50, ln["unidades"])
-personas = st.slider("Nº Personas", 0, 100, ln["personas"])
-coste_personal = st.slider("Coste Medio Personal (€)", 30000, 90000, ln["coste_medio_persona"], step=5000)
-subactividad = st.slider("Subactividad (%)", 0, 30, param["subactividad_permitida_%"])
+    # 📊 Gráfico ingresos/costes/margen
+    st.subheader(f"📊 Ingresos vs Costes Directos vs Margen Bruto – {linea}")
+    ingresos_simulados = tarifa * proyectos
+    costes_directos_simulados = (coste_personal * personas) + (ln["costes_directos_%"]/100 * ingresos_simulados)
+    margen_bruto_simulado = ingresos_simulados - costes_directos_simulados
 
-# Nuevo cálculo margen bruto
-ingresos_simulados = tarifa * proyectos
-costes_directos_simulados = (coste_personal * personas) + (ln["costes_directos_%"]/100 * ingresos_simulados)
-margen_bruto_simulado = ingresos_simulados - costes_directos_simulados
+    fig3, ax3 = plt.subplots()
+    ax3.bar(["Ingresos", "Costes Directos", "Margen Bruto"],
+            [ingresos_simulados, costes_directos_simulados, margen_bruto_simulado],
+            color=["#144C44", "#fb9200", "#144C44"])
+    for i, val in enumerate([ingresos_simulados, costes_directos_simulados, margen_bruto_simulado]):
+        ax3.text(i, val, formato_eur(val), ha='center', va='bottom', fontsize=10)
+    st.pyplot(fig3)
 
-st.success(f"📈 Nuevo Margen Bruto Simulado: {formato_eur(margen_bruto_simulado)} €")
+# 📊 Gráfico agregado total de todas las líneas de negocio
+st.subheader("📊 Total Todas las Líneas de Negocio")
 
-# Gráfico de utilización
-st.subheader("📊 Utilización del Equipo")
-fig2, ax2 = plt.subplots()
-ax2.barh(["Utilización"], [res['subactividad']['utilizacion_real_%']], color="#144C44")
-ax2.axvline(benchmark['utilizacion_%'], color="#fb9200", linestyle='--', label='Benchmark')
-ax2.set_xlim(0, 100)
-ax2.set_xlabel("%")
-ax2.legend()
-st.pyplot(fig2)
+# Cálculo total actual (sin simulación todavía)
+ingresos_totales = res['facturacion_total']
+costes_directos_totales = res['costes_directos']
+margen_bruto_total = res['margen_bruto']
 
-# Gráfico ingresos/costes/margen
-st.subheader("📊 Ingresos vs Costes Directos vs Margen Bruto")
-fig3, ax3 = plt.subplots()
-ax3.bar(["Ingresos", "Costes Directos", "Margen Bruto"],
-        [ingresos_simulados, costes_directos_simulados, margen_bruto_simulado],
-        color=["#144C44", "#fb9200", "#144C44"])
-for i, val in enumerate([ingresos_simulados, costes_directos_simulados, margen_bruto_simulado]):
-    ax3.text(i, val, formato_eur(val), ha='center', va='bottom', fontsize=10)
-st.pyplot(fig3)
+fig_total, ax_total = plt.subplots()
+ax_total.bar(["Ingresos Totales", "Costes Directos Totales", "Margen Bruto Total"],
+             [ingresos_totales, costes_directos_totales, margen_bruto_total],
+             color=["#144C44", "#fb9200", "#144C44"])
+for i, val in enumerate([ingresos_totales, costes_directos_totales, margen_bruto_total]):
+    ax_total.text(i, val, formato_eur(val), ha='center', va='bottom', fontsize=10)
+st.pyplot(fig_total)
+
