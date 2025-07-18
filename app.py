@@ -57,6 +57,8 @@ st.markdown("""
         margin: 8px 0;
         box-shadow: 0px 2px 5px rgba(0,0,0,0.1);
         text-align: center;
+        word-wrap: normal !important;
+        overflow: visible !important;
     }
     .stMetric .metric-label {
         color: #144C44 !important;
@@ -73,7 +75,6 @@ st.markdown("""
     }
     </style>
     """, unsafe_allow_html=True)
-
 
 # 📂 Cargar datos
 with open("data/presupuesto_it_2025.json", "r", encoding="utf-8") as f:
