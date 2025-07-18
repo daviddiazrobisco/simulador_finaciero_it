@@ -1,114 +1,103 @@
 import streamlit as st
 import json
-import plotly.graph_objects as go
+import pandas as pd
+import matplotlib.pyplot as plt
 
-# --- Cargar JSON inicial ---
-with open("datos.json", "r") as f:
-    data = json.load(f)
+# 📂 Cargar datos
+with open("data/presupuesto_it_2025.json", "r", encoding="utf-8") as f:
+    datos = json.load(f)
 
-# --- Título y descripción ---
-st.title(f"📊 Simulador Financiero - {data['empresa']} ({data['anio']})")
-st.markdown("Ajusta los parámetros para ver el impacto en facturación, margen, EBITDA y utilización de equipos con gráficos en tiempo real.")
+with open("data/resumen_benchmark.json", "r", encoding="utf-8") as f:
+    benchmark = json.load(f)
 
-# --- Sliders por línea de negocio ---
-st.header("🎛️ Parámetros - Líneas de Negocio")
-for linea, valores in data['parametros']['lineas_negocio'].items():
-    st.subheader(f"🔹 {linea}")
-    valores['tarifa'] = st.slider(f"Tarifa {linea} (€)", 0, 2000, valores['tarifa'], 50)
-    valores['unidades'] = st.number_input(f"Nº {linea} (proyectos/licencias/contratos)", 0, 100, valores['unidades'])
-    if valores['personas'] > 0:
-        valores['personas'] = st.number_input(f"Personas dedicadas a {linea}", 0, 200, valores['personas'])
-        valores['jornadas_por_persona'] = st.number_input(f"Jornadas/año por persona en {linea}", 0, 300, valores['jornadas_por_persona'])
-        valores['coste_medio_persona'] = st.number_input(f"Coste medio persona en {linea} (€)", 0, 100000, valores['coste_medio_persona'], 1000)
+# 📌 Extraer datos generales
+empresa = datos["empresa"]
+anio = datos["anio"]
+param = datos["parametros"]
+res = datos["resultados"]
 
-# --- Sliders de costes fijos ---
-st.header("🎛️ Parámetros - Costes Fijos")
-for coste, valor in data['parametros']['costes_fijos'].items():
-    data['parametros']['costes_fijos'][coste] = st.number_input(f"{coste.capitalize()} (€)", 0, 500000, int(valor), 1000)
+# 🎨 Estilos
+st.set_page_config(page_title="Simulador PyG IT", layout="wide")
 
-# --- Cálculos completos ---
-facturacion_total = 0
-jornadas_disponibles_totales = 0
-jornadas_necesarias_totales = 0
-costes_directos_totales = 0
-facturacion_lineas = {}
-utilizacion_lineas = {}
+st.title(f"📊 Simulador PyG – {empresa} ({anio})")
 
-for linea, valores in data['parametros']['lineas_negocio'].items():
-    # Facturación por línea
-    facturacion_linea = valores['unidades'] * valores['ticket_medio']
-    facturacion_lineas[linea] = facturacion_linea
-    facturacion_total += facturacion_linea
+# ---------------------
+# 🔵 VISIÓN GENERAL
+# ---------------------
+st.header("🔵 Visión General")
+col1, col2, col3, col4 = st.columns(4)
 
-    # Jornadas necesarias
-    jornadas_necesarias = facturacion_linea / valores['tarifa'] if valores['tarifa'] else 0
-    jornadas_necesarias_totales += jornadas_necesarias
+# KPIs
+col1.metric("Facturación Total", f"{res['facturacion_total']:,} €")
+col2.metric("Margen Bruto", f"{res['margen_bruto']:,} € ({(res['margen_bruto']/res['facturacion_total'])*100:.1f}%)",
+            f"Benchmark: {benchmark['margen_bruto_%']}%")
+col3.metric("Costes Fijos", f"{res['costes_fijos']:,} € ({(res['costes_fijos']/res['facturacion_total'])*100:.1f}%)",
+            f"Benchmark: {benchmark['costes_fijos_%']}%")
+col4.metric("EBITDA", f"{res['ebitda']:,} € ({res['ebitda_%']:.1f}%)",
+            f"Benchmark: {benchmark['ebitda_%']}%")
 
-    # Jornadas disponibles
-    jornadas_disponibles = valores['personas'] * valores['jornadas_por_persona']
-    jornadas_disponibles_totales += jornadas_disponibles
+# Alertas
+if res["subactividad"]["utilizacion_real_%"] < benchmark["utilizacion_%"]:
+    st.warning(f"⚠️ Utilización baja: {res['subactividad']['utilizacion_real_%']}% vs Benchmark {benchmark['utilizacion_%']}%")
+if (res['margen_bruto']/res['facturacion_total'])*100 < benchmark["margen_bruto_%"]:
+    st.error("❗ Margen Bruto por debajo del benchmark")
 
-    # Utilización por línea
-    utilizacion = (jornadas_necesarias / jornadas_disponibles * 100) if jornadas_disponibles else 0
-    utilizacion_lineas[linea] = round(utilizacion, 1)
+# Waterfall PyG
+st.subheader("💸 Cuenta de Resultados (Waterfall)")
+fig, ax = plt.subplots(figsize=(8,4))
+labels = ["Ingresos", "Costes Directos", "Margen Bruto", "Costes Fijos", "EBITDA"]
+values = [
+    res['facturacion_total'],
+    -res['costes_directos'],
+    res['margen_bruto'],
+    -res['costes_fijos'],
+    res['ebitda']
+]
+ax.bar(labels, values, color=["green", "red", "green", "red", "blue"])
+ax.set_ylabel("€")
+st.pyplot(fig)
 
-    # Coste directo
-    coste_directo_linea = valores['personas'] * valores['coste_medio_persona']
-    costes_directos_totales += coste_directo_linea
+# ---------------------
+# 🟧 ANÁLISIS LÍNEA NEGOCIO
+# ---------------------
+st.header("🟧 Análisis por Línea de Negocio")
+lineas = list(param["lineas_negocio"].keys())
+linea_seleccionada = st.selectbox("Selecciona línea de negocio", lineas)
 
-# Subactividad
-subactividad_jornadas = max(jornadas_disponibles_totales - jornadas_necesarias_totales, 0)
-subactividad_coste = (subactividad_jornadas / jornadas_disponibles_totales) * costes_directos_totales if jornadas_disponibles_totales else 0
+ln = param["lineas_negocio"][linea_seleccionada]
 
-# Margen y EBITDA
-margen_bruto = facturacion_total - costes_directos_totales
-costes_fijos_totales = sum(data['parametros']['costes_fijos'].values())
-ebitda = margen_bruto - costes_fijos_totales
-ebitda_pct = (ebitda / facturacion_total) * 100 if facturacion_total else 0
+# KPIs Línea
+st.subheader(f"📊 KPIs: {linea_seleccionada}")
+col5, col6, col7 = st.columns(3)
+margen_bruto_ln = ln["tarifa"] * ln["unidades"] - ln["costes_directos_%"]/100 * (ln["tarifa"] * ln["unidades"])
+utilizacion = res["subactividad"]["utilizacion_real_%"]
 
-# Utilización global
-utilizacion_global = (jornadas_necesarias_totales / jornadas_disponibles_totales * 100) if jornadas_disponibles_totales else 0
+col5.metric("Tarifa (€/día)", f"{ln['tarifa']:,}",
+            f"Benchmark: {benchmark['tarifa_eur_dia']} €")
+col6.metric("Coste Medio Personal", f"{ln['coste_medio_persona']:,} €",
+            f"Benchmark: {benchmark['coste_medio_persona_eur']} €")
+col7.metric("Utilización (%)", f"{utilizacion}%",
+            f"Benchmark: {benchmark['utilizacion_%']}%")
 
-# --- Mostrar métricas principales ---
-st.header("📈 Resultados Generales")
-col1, col2, col3 = st.columns(3)
-col1.metric("Facturación Total", f"{facturacion_total:,.0f} €")
-col2.metric("Margen Bruto", f"{margen_bruto:,.0f} € ({(margen_bruto/facturacion_total)*100:.1f}%)")
-col3.metric("EBITDA", f"{ebitda:,.0f} € ({ebitda_pct:.1f}%)")
+# 🎛️ Sliders de simulación
+st.subheader("🎛️ Simula ajustes:")
+tarifa = st.slider("Tarifa (€/día)", 0, 2000, ln["tarifa"], step=50)
+proyectos = st.slider("Nº Proyectos", 0, 50, ln["unidades"])
+coste_personal = st.slider("Coste Medio Personal (€)", 30000, 90000, ln["coste_medio_persona"], step=5000)
+subactividad = st.slider("Subactividad (%)", 0, 30, param["subactividad_permitida_%"])
 
-st.metric("Utilización Global del Equipo", f"{utilizacion_global:.1f}%")
-st.metric("Subactividad (coste)", f"{subactividad_coste:,.0f} €")
+# Nuevo cálculo margen bruto
+ingresos_simulados = tarifa * proyectos
+costes_directos_simulados = (coste_personal * ln["personas"]) + (ln["costes_directos_%"]/100 * ingresos_simulados)
+margen_bruto_simulado = ingresos_simulados - costes_directos_simulados
 
-# Alertas visuales
-if utilizacion_global < 50:
-    st.error("⚠️ Baja utilización: riesgo alto de subactividad")
-elif utilizacion_global < 70:
-    st.warning("🟡 Utilización moderada: posible subactividad")
-else:
-    st.success("✅ Buena utilización del equipo")
+st.success(f"📈 Nuevo Margen Bruto Simulado: {margen_bruto_simulado:,.0f} €")
 
-# --- Gráficos dinámicos ---
-st.header("📊 Visualizaciones")
+if subactividad > benchmark["subactividad_max_%"]:
+    st.warning(f"⚠️ Subactividad alta: {subactividad}% vs Benchmark {benchmark['subactividad_max_%']}%")
 
-# Gráfico 1: Facturación por línea
-fig1 = go.Figure([go.Bar(x=list(facturacion_lineas.keys()), y=list(facturacion_lineas.values()))])
-fig1.update_layout(title="Facturación por Línea de Negocio", xaxis_title="Línea", yaxis_title="Facturación (€)")
-st.plotly_chart(fig1, use_container_width=True)
-
-# Gráfico 2: Utilización por línea
-fig2 = go.Figure([go.Bar(x=list(utilizacion_lineas.keys()), y=list(utilizacion_lineas.values()), marker_color='orange')])
-fig2.update_layout(title="Utilización por Línea de Negocio (%)", xaxis_title="Línea", yaxis_title="Utilización (%)")
-st.plotly_chart(fig2, use_container_width=True)
-
-# Gráfico 3: EBITDA vs Costes
-fig3 = go.Figure()
-fig3.add_trace(go.Bar(name="EBITDA", x=["EBITDA"], y=[ebitda]))
-fig3.add_trace(go.Bar(name="Costes Fijos", x=["Costes Fijos"], y=[costes_fijos_totales]))
-fig3.update_layout(title="EBITDA vs Costes Fijos", barmode='group', yaxis_title="€")
-st.plotly_chart(fig3, use_container_width=True)
-
-# --- Botón para descargar JSON actualizado ---
-if st.button("📥 Descargar JSON Actualizado"):
-    with open("json_actualizado.json", "w") as out:
-        json.dump(data, out, indent=4)
-    st.success("JSON actualizado guardado.")
+# Gráfico de barras
+st.subheader("📊 Ingresos vs Costes Directos")
+fig2, ax2 = plt.subplots()
+ax2.bar(["Ingresos", "Costes Directos"], [ingresos_simulados, costes_directos_simulados], color=["green", "red"])
+st.pyplot(fig2)
