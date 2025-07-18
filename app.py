@@ -50,19 +50,30 @@ st.markdown("""
     .stButton>button:hover {
         background-color: #e67e00;
     }
-    .metric-label {
+    .stMetric {
+        background-color: #F2F2F2 !important;
+        border-radius: 12px;
+        padding: 16px;
+        margin: 8px 0;
+        box-shadow: 0px 2px 5px rgba(0,0,0,0.1);
+        text-align: center;
+    }
+    .stMetric .metric-label {
         color: #144C44 !important;
         font-weight: bold;
+        font-size: 1.2em;
     }
-    .metric-value {
-        font-size: 2.0em !important;
+    .stMetric .metric-value {
+        font-size: 2.5em !important;
         color: #333333;
     }
-    .metric-delta {
-        font-size: 0.9em !important;
+    .stMetric .metric-delta {
+        font-size: 1.0em !important;
+        color: #fb9200;
     }
     </style>
     """, unsafe_allow_html=True)
+
 
 # 📂 Cargar datos
 with open("data/presupuesto_it_2025.json", "r", encoding="utf-8") as f:
